@@ -1,31 +1,61 @@
 #!/bin/bash
 
-# Output CSV file
-output_file="pokemon_report.csv"
+# Create directory for Pokémon data
+mkdir -p pokemon_data
 
-# Initialize CSV header
-echo "Name,Height (m),Weight (kg)" > "$output_file"
+# List of Pokémon to fetch
+pokemon_list=("bulbasaur" "ivysaur" "venusaur" "charmander" "charmeleon")
 
-# Process all JSON files
-for file in pokemon_data/*.json; do
-    # Extract and format data using jq and sed
-    jq -r '"\(.name),\(.height/10),\(.weight/10)"' "$file" | \
-    sed 's/^\(.\)/\U\1/' >> "$output_file"
+# Base API URL
+api_url="https://pokeapi.co/api/v2/pokemon"
+
+# Delay between requests (in seconds)
+delay=2
+
+# Log file for errors
+error_log="pokemon_errors.log"
+echo "Failed Pokémon downloads - $(date)" > "$error_log"
+
+for pokemon in "${pokemon_list[@]}"; do
+  echo "Fetching data for $pokemon..."
+  
+  retry_count=0
+  max_retries=3
+  success=false
+  
+  while [ $retry_count -lt $max_retries ] && [ "$success" = false ]; do
+    # Make API request
+    response=$(curl -s -w "%{http_code}" "${api_url}/${pokemon}" -o "pokemon_data/${pokemon}.json.tmp")
+    status_code=${response: -3}
+    
+    # Validate response
+    if [ "$status_code" -eq 200 ] && jq -e . "pokemon_data/${pokemon}.json.tmp" >/dev/null 2>&1; then
+      success=true
+      mv "pokemon_data/${pokemon}.json.tmp" "pokemon_data/${pokemon}.json"
+      echo "Saved data to pokemon_data/${pokemon}.json ✅"
+    else
+      retry_count=$((retry_count + 1))
+      echo "Attempt $retry_count failed for $pokemon (HTTP $status_code)"
+      rm -f "pokemon_data/${pokemon}.json.tmp"
+      
+      if [ $retry_count -lt $max_retries ]; then
+        echo "Retrying in $delay seconds..."
+        sleep $delay
+      fi
+    fi
+  done
+  
+  if [ "$success" = false ]; then
+    echo "Failed to fetch $pokemon after $max_retries attempts ❌"
+    echo "$pokemon (HTTP $status_code)" >> "$error_log"
+    rm -f "pokemon_data/${pokemon}.json" 2>/dev/null
+  fi
+  
+  # Add delay between Pokémon requests
+  sleep $delay
 done
 
-# Calculate averages using awk
-awk -F, '
-NR > 1 {  # Skip header
-    total_h += $2
-    total_w += $3
-    count++
-}
-END {
-    printf "\nAverage Height: %.2f m\n", total_h/count
-    printf "Average Weight: %.2f kg\n", total_w/count
-}
-' "$output_file"
-
-# Display report
-echo "CSV Report generated at: $output_file"
-cat "$output_file"
+echo -e "\nDownload summary:"
+echo "Successful: $(ls -1 pokemon_data/*.json 2>/dev/null | wc -l)"
+echo "Failed: $(grep -vc "^Failed" "$error_log")"
+echo "Error log: $error_log"
