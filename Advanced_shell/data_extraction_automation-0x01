@@ -34,12 +34,18 @@
 #!/bin/bash
 
 # Extract data using jq
+#!/bin/bash
+
+# Extract data using jq
 name=$(jq -r '.name' pikachu.json)
-height=$(jq -r '.height / 10' pikachu.json)
-weight=$(jq -r '.weight / 10' pikachu.json)
+raw_height=$(jq -r '.height' pikachu.json)
+raw_weight=$(jq -r '.weight' pikachu.json)
 type=$(jq -r '.types[0].type.name' pikachu.json)
 
-# Format output using awk and sed to match the exact template
-awk -v name="$name" -v type="$type" -v weight="$weight" -v height="$height" \
-  'BEGIN { printf "%s is of type %s, weighs %skg, and is %sm tall.\n", name, type, weight, height }' \
-  | sed 's/  */ /g'  # Ensure no double spaces
+# Convert units (decimeters->meters, hectograms->kg)
+formatted_height=$(awk -v h="$raw_height" 'BEGIN { printf "%.1f", h/10 }')
+formatted_weight=$(awk -v w="$raw_weight" 'BEGIN { printf "%d", w/10 }')
+
+# Format output with required variable names
+echo "$name is of type $type, weighs ${formatted_weight}kg, and is ${formatted_height}m tall." \
+  | sed 's/  */ /g'  # Clean any double spaces (though unlikely here)
