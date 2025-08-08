@@ -1,61 +1,53 @@
 #!/bin/bash
 
-# Create directory for Pokémon data
-mkdir -p pokemon_data
+# This script fetches data for a list of Pokémon from the PokeAPI.
+# It includes robust error handling and a retry mechanism for each request.
 
-# List of Pokémon to fetch
-pokemon_list=("bulbasaur" "ivysaur" "venusaur" "charmander" "charmeleon")
+# Define a list of Pokémon to fetch.
+# The list includes one valid and one invalid name to demonstrate error handling.
+pokemon_list=("pikachu" "charizard" "invalid_pokemon" "squirtle")
 
-# Base API URL
-api_url="https://pokeapi.co/api/v2/pokemon"
+# Set the maximum number of retries.
+MAX_RETRIES=3
 
-# Delay between requests (in seconds)
-delay=2
+# Clear the error log file before starting.
+> errors.txt
 
-# Log file for errors
-error_log="pokemon_errors.log"
-echo "Failed Pokémon downloads - $(date)" > "$error_log"
-
+# Loop through each Pokémon in the list.
 for pokemon in "${pokemon_list[@]}"; do
-  echo "Fetching data for $pokemon..."
-  
-  retry_count=0
-  max_retries=3
-  success=false
-  
-  while [ $retry_count -lt $max_retries ] && [ "$success" = false ]; do
-    # Make API request
-    response=$(curl -s -w "%{http_code}" "${api_url}/${pokemon}" -o "pokemon_data/${pokemon}.json.tmp")
-    status_code=${response: -3}
+    echo "Attempting to fetch data for $pokemon..."
+
+    # Initialize retry counter.
+    retries=0
     
-    # Validate response
-    if [ "$status_code" -eq 200 ] && jq -e . "pokemon_data/${pokemon}.json.tmp" >/dev/null 2>&1; then
-      success=true
-      mv "pokemon_data/${pokemon}.json.tmp" "pokemon_data/${pokemon}.json"
-      echo "Saved data to pokemon_data/${pokemon}.json ✅"
-    else
-      retry_count=$((retry_count + 1))
-      echo "Attempt $retry_count failed for $pokemon (HTTP $status_code)"
-      rm -f "pokemon_data/${pokemon}.json.tmp"
-      
-      if [ $retry_count -lt $max_retries ]; then
-        echo "Retrying in $delay seconds..."
-        sleep $delay
-      fi
+    # Start the retry loop.
+    while [ $retries -lt $MAX_RETRIES ]; do
+        # Use curl to make the request.
+        # -s: Silent mode, no progress meter.
+        # -f: Fail fast on server errors (4xx/5xx).
+        # >: Redirect stdout (JSON data) to a file.
+        # 2>&1: Redirect stderr to stdout.
+        # ||: Logical OR, check if the command failed.
+        if curl -sf "https://pokeapi.co/api/v2/pokemon/$pokemon" > "$pokemon.json" 2>&1; then
+            echo "Successfully fetched data for $pokemon."
+            # Break the retry loop if successful.
+            break
+        else
+            retries=$((retries+1))
+            # Log the error and the retry attempt.
+            echo "Error fetching $pokemon (attempt $retries of $MAX_RETRIES)." >> errors.txt
+            
+            # If it's not the last attempt, sleep for a bit before retrying.
+            if [ $retries -lt $MAX_RETRIES ]; then
+                sleep 2
+            fi
+        fi
+    done
+
+    # If retries have been exhausted and the file doesn't exist, it's a permanent failure.
+    if [ ! -f "$pokemon.json" ]; then
+        echo "Failed to fetch $pokemon after $MAX_RETRIES attempts." >> errors.txt
     fi
-  done
-  
-  if [ "$success" = false ]; then
-    echo "Failed to fetch $pokemon after $max_retries attempts ❌"
-    echo "$pokemon (HTTP $status_code)" >> "$error_log"
-    rm -f "pokemon_data/${pokemon}.json" 2>/dev/null
-  fi
-  
-  # Add delay between Pokémon requests
-  sleep $delay
 done
 
-echo -e "\nDownload summary:"
-echo "Successful: $(ls -1 pokemon_data/*.json 2>/dev/null | wc -l)"
-echo "Failed: $(grep -vc "^Failed" "$error_log")"
-echo "Error log: $error_log"
+echo "Script finished. Check data files and errors.txt for results."
