@@ -1,3 +1,16 @@
 #!/bin/bash
-jq -r '"\(.name | ascii_upcase) is of type \(.types[0].type.name | ascii_upcase), weighs \(.weight / 10)kg, and is \(.height / 10)m tall."' data.json
 
+# This script reads the 'data.json' file, extracts specific details,
+# and formats them into a human-readable sentence.
+# It uses 'jq' to parse the JSON and assigns the values to shell variables.
+# The 'weight' and 'height' are divided by 10 to convert them to kg and meters,
+# as per the desired output format.
+
+# Use jq to extract values and assign them to shell variables
+name=$(jq -r '.name' data.json)
+type=$(jq -r '.types[0].type.name' data.json)
+weight_kg=$(jq -r '.weight / 10' data.json)
+height_m=$(jq -r '.height / 10' data.json)
+
+# Print the formatted string to standard output
+echo "$name is of type $type, weighs ${weight_kg}kg, and is ${height_m}m tall."
