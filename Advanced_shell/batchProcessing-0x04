@@ -1,0 +1,29 @@
+#!/bin/bash
+
+# This script fetches data for a list of Pokémon in parallel.
+# It uses background processes to make the API requests concurrently,
+# and the 'wait' command to ensure the script doesn't exit until all
+# background jobs are complete.
+
+# Define the list of Pokémon to fetch.
+pokemon_list=("Bulbasaur" "Ivysaur" "Venusaur" "Charmander" "Charmeleon")
+
+# Clear the errors.txt file before starting.
+> errors.txt
+
+# Loop through the list of Pokémon and start a background process for each.
+for pokemon in "${pokemon_list[@]}"; do
+    echo "Starting background fetch for $pokemon..."
+
+    # Use curl to make the request and save the output.
+    # The `&` at the end of the command sends it to the background.
+    # We redirect both stdout and stderr to a file to capture any errors.
+    curl -s "https://pokeapi.co/api/v2/pokemon/${pokemon,,}" > "${pokemon,,}.json" 2>> errors.txt &
+done
+
+# The `wait` command is crucial here. It pauses the script until all
+# background processes (jobs) have completed their execution.
+echo "All background processes have been started. Waiting for them to complete..."
+wait
+
+echo "All Pokémon data has been fetched. Check the generated JSON files and errors.txt."
