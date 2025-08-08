@@ -4,9 +4,29 @@
 # It uses background processes to make the API requests concurrently,
 # and the 'wait' command to ensure the script doesn't exit until all
 # background jobs are complete.
+#
+# This version includes a 'trap' command to properly handle background
+# processes by killing them if the script is terminated prematurely.
 
 # Define the list of Pokémon to fetch.
 pokemon_list=("Bulbasaur" "Ivysaur" "Venusaur" "Charmander" "Charmeleon")
+
+# An array to hold the Process IDs (PIDs) of the background jobs.
+pids=()
+
+# The cleanup function to kill all background processes if the script is interrupted.
+cleanup() {
+    echo "Terminating all background processes..."
+    # The 'kill' command is used here to send a signal to each PID.
+    # We use kill 0, which sends the signal to all processes in the same process group.
+    # This is a safer and more robust way to clean up.
+    kill 0
+    exit 1
+}
+
+# The 'trap' command catches signals (like TERM, INT from Ctrl+C)
+# and runs the cleanup function.
+trap cleanup SIGINT SIGTERM
 
 # Clear the errors.txt file before starting.
 > errors.txt
@@ -19,6 +39,9 @@ for pokemon in "${pokemon_list[@]}"; do
     # The `&` at the end of the command sends it to the background.
     # We redirect both stdout and stderr to a file to capture any errors.
     curl -s "https://pokeapi.co/api/v2/pokemon/${pokemon,,}" > "${pokemon,,}.json" 2>> errors.txt &
+    
+    # Store the Process ID of the background job.
+    pids+=($!)
 done
 
 # The `wait` command is crucial here. It pauses the script until all
