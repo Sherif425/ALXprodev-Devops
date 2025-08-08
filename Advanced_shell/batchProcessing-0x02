@@ -1,0 +1,31 @@
+#!/bin/bash
+
+# Create directory for Pokémon data if it doesn't exist
+mkdir -p pokemon_data
+
+# List of Pokémon to fetch
+pokemon_list=("bulbasaur" "ivysaur" "venusaur" "charmander" "charmeleon")
+
+# Base API URL
+api_url="https://pokeapi.co/api/v2/pokemon"
+
+# Delay between requests (in seconds) to avoid rate limiting
+delay=2
+
+for pokemon in "${pokemon_list[@]}"; do
+  echo "Fetching data for $pokemon..."
+  
+  # Make API request and save response
+  curl -s "${api_url}/${pokemon}" > "pokemon_data/${pokemon}.json"
+  
+  # Check if request was successful
+  if jq -e . "pokemon_data/${pokemon}.json" >/dev/null 2>&1; then
+    echo "Saved data to pokemon_data/${pokemon}.json ✅"
+  else
+    echo "Failed to fetch data for $pokemon ❌"
+    rm "pokemon_data/${pokemon}.json" 2>/dev/null
+  fi
+  
+  # Add delay between requests
+  sleep $delay
+done
