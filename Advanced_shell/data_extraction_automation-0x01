@@ -1,9 +1,9 @@
 #!/bin/bash
 name=$(jq -r '.name' data.json)
 type=$(jq -r '.types[0].type.name' data.json)
-weight_kg=$(jq -r '.weight / 10' data.json)
-height_m=$(jq -r '.height / 10' data.json)
+formatted_weight=$(jq -r '.weight / 10' data.json)
+formatted_height=$(jq -r '.height / 10' data.json)
 
 # Print the formatted string to standard output
-echo "$name is of type $type, weighs ${weight_kg}kg, and is ${height_m}m tall."
+echo "$name is of type $type, weighs ${formatted_weight}kg, and is ${formatted_height}m tall."
 
